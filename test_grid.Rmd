@@ -1,0 +1,127 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidymodels)
+library(tidyflow)
+library(readr)       # for importing data
+library(vip)         # for variable importance plots
+library(readr)
+
+hotels <-
+  read_csv("https://tidymodels.org/start/case-study/hotels.csv") %>%
+  mutate_if(is.character, as.factor)
+
+lr_mod <- logistic_reg(penalty = tune(), mixture = 1) %>% set_engine("glmnet")
+
+holidays <- c("AllSouls", "AshWednesday", "ChristmasEve", "Easter",
+              "ChristmasDay", "GoodFriday", "NewYearsDay", "PalmSunday")
+
+lr_recipe <-
+  ~ .x %>%
+    recipe(children ~ .) %>%
+    step_date(arrival_date) %>%
+    step_holiday(arrival_date, holidays = holidays) %>%
+    step_rm(arrival_date) %>%
+    step_dummy(all_nominal(), -all_outcomes()) %>%
+    step_zv(all_predictors()) %>%
+    step_normalize(all_predictors())
+
+tflow <-
+  hotels %>%
+  tidyflow(seed = 123) %>%
+  plug_split(initial_split, strata = "children") %>%
+  plug_resample(validation_split, strata = "children", prop = 0.8) %>%
+  plug_recipe(lr_recipe) %>%
+  plug_grid(expand.grid, penalty = 10^seq(-4, -1, length.out = 30)) %>%
+  plug_model(lr_mod)
+
+cntrl <- control_tidyflow(control_grid = control_grid(save_pred = TRUE))
+p_res <- tflow %>% fit(control = cntrl)
+
+p_res %>%
+  pull_tflow_fit_tuning() %>%
+  collect_metrics() %>%
+  filter(.metric == "roc_auc") %>%
+  ggplot(aes(x = penalty, y = mean)) +
+  geom_point() +
+  geom_line() +
+  ylab("Area under the ROC Curve") +
+  scale_x_log10(labels = scales::label_number())
+
+top_models <-
+  p_res %>%
+  pull_tflow_fit_tuning() %>%
+  show_best("roc_auc", n = 15) %>%
+  arrange(penalty)
+
+lr_best <- top_models %>% slice(12)
+
+lr_auc <-
+  p_res %>%
+  pull_tflow_fit_tuning() %>%
+  collect_predictions(parameters = lr_best) %>%
+  roc_curve(children, .pred_children) %>%
+  mutate(model = "Logistic Regression")
+
+autoplot(lr_auc)
+
+# Let's run in parallel
+cores <- parallel::detectCores() - 2
+
+rf_mod <-
+  rand_forest(mtry = tune(), min_n = tune(), trees = 1000) %>%
+  set_engine("randomForest", num.threads = cores) %>%
+  set_mode("classification")
+
+rf_recipe <-
+  ~ .x %>%
+    recipe(children ~ .) %>%
+    step_date(arrival_date) %>%
+    step_holiday(arrival_date) %>%
+    step_rm(arrival_date)
+
+tflow <-
+  tflow %>%
+  replace_recipe(rf_recipe) %>%
+  replace_model(rf_mod) %>%
+  replace_grid(grid_latin_hypercube, size = 25)
+
+rf_res <- tflow %>% fit(control = cntrl)
+
+rf_res %>%
+  pull_tflow_fit_tuning() %>%
+  autoplot() +
+  ylim(c(0.88, 0.93))
+
+rf_best <-
+  rf_res %>%
+  pull_tflow_fit_tuning() %>%
+  select_best(metric = "roc_auc")
+
+rf_auc <-
+  rf_res %>%
+  pull_tflow_fit_tuning() %>%
+  collect_predictions(parameters = rf_best) %>%
+  roc_curve(children, .pred_children) %>%
+  mutate(model = "Random Forest")
+
+bind_rows(rf_auc, lr_auc) %>%
+  ggplot(aes(x = 1 - specificity, y = sensitivity, col = model)) +
+  geom_path(lwd = 1.5, alpha = 0.8) +
+  geom_abline(lty = 3) +
+  coord_equal() +
+  scale_color_viridis_d(option = "plasma", end = .6)
+
+final_res <-
+  rf_res %>%
+  complete_tflow(metric = "roc_auc")
+
+final_res %>%
+  predict_testing(type = "prob") %>%
+  roc_curve(children, .pred_children) %>%
+  autoplot()
+```
+
