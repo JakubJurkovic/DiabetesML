@@ -1,5 +1,5 @@
 ---
-title: "Biological Dataased & Datamining : Final"
+title: "Biological Databases & Datamining : Final"
 description: |
   Creating a prediction model for diabetes patients.
 author:
@@ -16,7 +16,7 @@ output:
 ---
 
 # Predicting Diabetes in patients
-The following document is a final project fro Biological Databases & Datamining, in which we will attempt to build and evaluate mulptiple models to predict diabetes in patients. The caveat is that we expect our training data to cotain a lot of missing data.
+The following document is a final project fro Biological Databases & Data mining, in which we will attempt to build and evaluate multiple models to predict diabetes in patients. The caveat is that we expect our training data to contain a lot of missing data.
 
 ```{r setup, include=FALSE, echo=FALSE}
 # Packages
@@ -31,16 +31,22 @@ library(AUC) # Evaluating Models
 library(reshape2) # To melt more easily
 library(kknn) # KNN Library
 
+knitr::opts_chunk$set(cache = TRUE)
 ```
 
 # Data Loading 
-```{r dataLoad}
+Let's Load the data and have a quick glance at it!
+
+```{r dataLoad, layout="l-page"}
 data <- read.csv("PimaIndiansDiabetes.csv")
+rmarkdown::paged_table(data)
 ```
 
-# Q1 Which variables are numeric and which are categorical?
+# Q1: Numerical & Categorical data
+*Which variables are numeric and which are categorical?*
 
 The attributes are:
+
 * Pregnancies: Number of times pregnant 
 * Glucose: Plasma glucose concentration a 2 hours in an oral glucose tolerance test 
 * BloodPressure: Diastolic blood pressure (mm Hg) 
@@ -51,20 +57,20 @@ The attributes are:
 * Age: Age (years) 
 * Outcome: Class variable (0 or 1) where 1 means they have diabetes.
 
-From this we see that only `outcome` is *categorical*. A debate can be held about pregnancies being categorical, however it is in the end just a discrete quantitative variable.
+From this we see that only **Outcome** is **categorical**. A debate can be held about pregnancies being categorical, however it is in the end just a discrete quantitative variable.
 
 ```{r}
-head(data)
 # We see Outcome is categorical, hence will be recast as factor
 
 #The code is commented out since corr plot complains with factors, will be factorized later
 data$Outcome <- factor(data$Outcome, labels = c("Healthy", "Diabetes"))
 ```
 
-# Q2: Use appropriate graphs to predict which of the variables (on their own) are most helpful in predicting the outcome? 
-* For each variable draw an appropriate graph ( boxplot for numerical values and barplot for categorical values).
+# Q2: Overviewing the dataset
+*Use appropriate graphs to predict which of the variables (on their own) are most helpful in predicting the outcome?*
+Let's use Violin plots to overview our population, jitter dot plots to see clusterings and heat map to see associations.
 
-```{r VariablesInspection, fig.width=8}
+```{r VariablesInspection, layout="l-page", fig.width=8}
 data_long <-  read.csv("PimaIndiansDiabetes.csv") %>% 
   pivot_longer(cols = 1:8, names_to = "Variable", values_to = "Value")
 
@@ -87,7 +93,7 @@ data_long %>% ggplot(mapping = aes(x=Variable, y=Value, col=as.factor(Outcome)))
   theme_minimal()
 
 
-data_long %>% ggplot(mapping = aes(x=as.factor(Outcome))) +
+data %>% ggplot(mapping = aes(x=as.factor(Outcome))) +
   geom_bar() +
   theme_minimal() +
   labs(
@@ -110,7 +116,7 @@ ggplot(data = melt_cor_data, aes(x=Var1, y=Var2, fill=value)) +
   )
 ```
 The violin plots shows us the distribution of our populations for each value, and gives a hint at present outliers. We see that some of them also contain missing data (to be handled later).
-The jittered point plot reveals some clear clusters being observable between the diagnosis. The most notable one is in the `Glucose` & `BMI` plot, which is also confirmed by the correlation heatmap - these should be the most contributing variables to the predictions.
+The jittered point plot reveals some clear clusters being observable between the diagnosis. The most notable one is in the **Glucose** & **BMI** plot, which is also confirmed by the correlation heat map - these should be the most contributing variables to the predictions.
 
 # Q3 + Q4: Handling missing data & Normalization
 
@@ -128,7 +134,7 @@ for (i in 1:8){
 data_na <- read.csv("PimaIndiansDiabetes.csv") %>%  mutate_at(2:6 ,~na_if(., 0))
 ```
 
-We see that `Age` and `DiabetesPedigreeFunction` have no entries where the value is 0. We have quite a lot of 0s for pregnancies, but that makes buological sense. For the remaining variables: `Glucose`, `BloodPressure`, `SkinThickness`, `Insulin`, `BMI`, we will assume that the 0s represent NAs and hence should be imputed. We can't realy drop the NAs as `Insulin` has 322 missing values and we would loose a lot of our data.
+We see that **Age** and **DiabetesPedigreeFunction** have no entries where the value is 0. We have quite a lot of 0s for pregnancies, but that makes buological sense. For the remaining variables: **Glucose**, **BloodPressure**, **SkinThickness**, **Insulin**, **BMI**, we will assume that the 0s represent NAs and hence should be imputed. We can't realy drop the NAs as **Insulin** has 322 missing values and we would loose a lot of our data.
 
 ## Normalization 
 In order to handle the missing data, I want to deploy an KNN imputer. This however requires the dataset to be normalized a slightly earlier than the homework asks for. However, any imputed data should be within the normalized range.
@@ -146,7 +152,7 @@ for (i in 1:8){
 ## Imputing
 Originally I planned to remove the DV from the data available for the KNN Imputer, but based on https://doi.org/10.1186/s12874-016-0281-5 I learned that it is better to keep the DV for the imputer. 
 
-```{r Imputing, fig.width=8}
+```{r Imputing, layout="l-page", fig.width=8}
 # Q3 Ctd
 
 # Run the KNN Imputer and bring back the outcome column
@@ -180,19 +186,20 @@ ggplot(data = melt_cor_data_imp, aes(x=Var1, y=Var2, fill=value)) +
 imputed_data$Outcome <- imputed_data$Outcome %>% factor()
 ```
 
-Looking at our violin plots their general "shapes" have remained almost the same, with the "tails" caused by excess NAs in the form have been de-facto trimed. This means that our imputer mantained the relative distribution of our values. We can also observe change in the correlation heatmap, boosting the importance of some factors that were otherwise masked by the high number of 0 present.
+Looking at our violin plots their general "shapes" have remained almost the same, with the "tails" caused by excess NAs in the form have been de-facto trimmed. This means that our imputer maintained the relative distribution of our values. We can also observe change in the correlation heat map, boosting the importance of some factors that were otherwise masked by the high number of 0 present.
 
 # Q5 : Model Training
 For this dataset I plan to try to train 3 types of models:
+
 1. KNN
 2. Random Forest
 3. Neural network
 
-The best performer will be then chosen based on the the mixutre of highest and least variable AUC.  
+The best performer will be then chosen based on the the mixture of highest and least variable AUC.  
 
 ## K-Fold Validation & AUC
 
-In order to utlize 100% of our dataset let's perform the k-fold validation. We can use `vfold_cv` command from base R.
+In order to utilize 100% of our dataset let's perform the k-fold validation. We can use **vfold_cv** command from base R.
 The performance of the model will be assessed using AUC.
 
 ```{r}
@@ -205,10 +212,11 @@ roc_res <- metric_set(roc_auc)
 ## Random Forest
 Let's use grid search to hyper tune the random forest. Engine used for the forest will be cforest from party package.
 The parameters used for hyper tuning will be 
+
 1. number of random variables (mtry)
 2. number of trees
 
-```{r RandomForest, fig.width=8}
+```{r RandomForest, layout="l-page", fig.width=8, cache=TRUE}
 # Let's create a Tidy Random Forest Model
 # The tidy approach allows us to modify the engine in the 
 # later stage of the project
@@ -259,11 +267,11 @@ autoplot(rf_reg_tune) +
   labs(y= "AUC")
 ```
 
-The hypertuning shows that the best parameters given this dataset for the cforest seesm to be 500 trees and 2 randomly selected predictors. With the best set of predictors 
+The hypertuning shows that the best parameters given this dataset for the cforest appear to be 500 trees and 2 randomly selected predictors.
 
 ## KNN
 
-```{r KNN, fig.width=8}
+```{r KNN, layout="l-page", fig.width=8, cache=TRUE}
 # Tidy (Parsnip's) KNN Model
 knn_model = nearest_neighbor(neighbors=tune()) %>% 
   set_engine("kknn", trace = 0) %>% 
@@ -310,11 +318,11 @@ autoplot(knn_reg_tune) +
   labs(y= "AUC")
 ```
 
-The KNN's hypertuning through grid search revealed that the performance plateu's at k=50, however most of the imprtance is achieved at k=29
+The KNN's hypertuning through grid search revealed that the performance platens at k=50, however most of the importance is achieved at k=29
 
 ## Neural Networks
 
-```{r NeuralNetworks, fig.width=8}
+```{r NeuralNetworks, layout="l-page", fig.width=8, cache=TRUE}
 # Tidy (Parsnip's) Neural Network Model
 nn_model = mlp(hidden_units = tune(), penalty = tune(), epochs = tune()) %>% 
   set_engine("nnet", trace = 0) %>% 
@@ -361,11 +369,15 @@ autoplot(nn_reg_tune) +
   labs(y= "AUC")
 ```
 
-Hyperturning of the neural network shows that the model with 1 hidden unit had the most consistent performance. Although some other models peaked above that one, it has been less consistent overall.
+Hypertuning of the neural network shows that the model with 1 hidden unit had the most consistent performance. Although some other models peaked above that one, it has been less consistent overall.
+
+# Q6: Wrapping up
+
+Both the neural network and random forest managed to produce at least one model that produced consistent AUC. However both models are somewhat prone to noise in randomness, and as such the random forest seems to more consistent (smaller variation in the AUC), and thus I am going to go forward with the random forest and its best parameters from the hyper tuning.
 
 ## Final Model
 
-Both the neural network and random forest managed to produce at least one model that produced consistent AUC. However both models are somewhat prone to noise in randomness, and as such the random forest seems to more consistent (smaller variation in the AUC), and thus I am going to go forward with the random forest and its best parameters from the hyper tuning.
+Let's build the final model and save it as an R object
 
 ```{r FinalModel}
 final_model <- cforest(Outcome ~ ., imputed_data, ntree = 500, mtry = 2)
