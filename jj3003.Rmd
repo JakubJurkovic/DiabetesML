@@ -13,6 +13,7 @@ output:
     toc: true
     toc_depth: 2
     code_folding: true
+    keep_md: true
 ---
 
 # Predicting Diabetes in patients
@@ -156,7 +157,7 @@ Originally I planned to remove the DV from the data available for the KNN Impute
 # Q3 Ctd
 
 # Run the KNN Imputer and bring back the outcome column
-data_na <- impute.knn(as.matrix(data_na), k = 15, rowmax = 0.5, colmax = 0.8, maxp = 1500, rng.seed=362436069)
+data_na <- impute.knn(as.matrix(data_na), k = 51, rowmax = 0.5, colmax = 0.8, maxp = 1500, rng.seed=362436069)
 imputed_data <- data_na[["data"]] %>% as.data.frame()
 imputed_data$Outcome <- read.csv("PimaIndiansDiabetes.csv")$Outcome
 
@@ -195,7 +196,7 @@ For this dataset I plan to try to train 3 types of models:
 2. Random Forest
 3. Neural network
 
-The best performer will be then chosen based on the the mixture of highest and least variable AUC.  
+The best performer will be then chosen based on the the mixture of highest and least variable AUC across parameters.  
 
 ## K-Fold Validation & AUC
 
@@ -267,7 +268,7 @@ autoplot(rf_reg_tune) +
   labs(y= "AUC")
 ```
 
-The hypertuning shows that the best parameters given this dataset for the cforest appear to be 500 trees and 2 randomly selected predictors.
+The hypertuning shows that the best parameters given this dataset for the cforest appear to be 500 trees and 2 randomly selected predictors. However the random forest is susceptible to the seed and it is better to notice the low variance in results showing that the capitalization of the grid search are minimal and hence the random forest offers consistent performance of AUC > 0.83
 
 ## KNN
 
@@ -373,11 +374,11 @@ Hypertuning of the neural network shows that the model with 1 hidden unit had th
 
 # Q6: Wrapping up
 
-Both the neural network and random forest managed to produce at least one model that produced consistent AUC. However both models are somewhat prone to noise in randomness, and as such the random forest seems to more consistent (smaller variation in the AUC), and thus I am going to go forward with the random forest and its best parameters from the hyper tuning.
+Both the neural network and random forest managed to produce at least one model that produced consistent AUC, and the KNN also seems quite promising. KNN as a model requires to store the dataset and doesn't handle outliers very well. Additionally both random forest and neural networks are somewhat prone to noise in randomness due to the seed. I've noticed that across multiple renderings and running of the code the best parameters and AUC fluctuated. As such the random forest seems to more consistent (smaller variation in the AUC), and thus I am going to go to choose random forest model due to its consistency. The chosen parameters are the one that came out the highest at the time of writing.
 
 ## Final Model
 
-Let's build the final model and save it as an R object
+Let's build the final model and save it as an R object. The acutal apramters here might differ from the best metrics above as there are mild fluctiations due to the seed used.
 
 ```{r FinalModel}
 final_model <- cforest(Outcome ~ ., imputed_data, ntree = 500, mtry = 2)
